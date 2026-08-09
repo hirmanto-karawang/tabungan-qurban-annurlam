@@ -271,7 +271,7 @@ export default async function handler(req, res) {
       }
 
       if (!sheet) {
-        return res.status(200).json({ status: 'API is running', timestamp: new Date(), debugSheetId: SHEET_ID, debugEnvSet: !!process.env.GOOGLE_SHEET_ID });
+        return res.status(200).json({ status: 'API is running', timestamp: new Date() });
       }
 
       const rows = await readSheet(sheet, accessToken);
