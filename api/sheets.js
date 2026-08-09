@@ -148,12 +148,6 @@ async function readAllSheetsBatch(accessToken) {
     });
     return result;
   } catch (err) {
-    // Kalau salah satu sheet di SHEET_NAMES belum ada (mis. sheet "Templates"
-    // belum dibuat user), Google Sheets API menolak SELURUH request batchGet
-    // (bukan cuma range yang bermasalah) -> tanpa fallback ini, satu sheet
-    // yang belum ada bisa bikin SEMUA data (Members, Savings, dst) gagal
-    // dimuat. Jadi kalau batch gagal, coba baca satu-satu; yang error
-    // (sheet belum ada) cukup dianggap kosong, bukan bikin semuanya gagal.
     console.error('batchGet gagal, fallback ke baca per-sheet:', err.message);
     const result = {};
     await Promise.all(SHEET_NAMES.map(async (name) => {
@@ -169,15 +163,15 @@ async function readAllSheetsBatch(accessToken) {
 }
 
 async function appendRow(sheetName, record, accessToken) {
-  // Ambil header dulu buat tahu urutan kolom
   const headerData = await sheetsFetch(`/values/${encodeURIComponent(sheetName)}!1:1`, accessToken);
   const headers = (headerData.values && headerData.values[0]) || [];
   const newRow = headers.map(h => (record[h] !== undefined ? record[h] : ''));
 
-  // valueInputOption=RAW penting: supaya nilai seperti "0812..." TIDAK diubah
-  // jadi angka (dan kehilangan 0 di depan) oleh Google Sheets.
+  const lastColLetter = columnToLetter(headers.length - 1);
+  const appendRange = `${encodeURIComponent(sheetName)}!A:${lastColLetter}`;
+
   await sheetsFetch(
-    `/values/${encodeURIComponent(sheetName)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    `/values/${appendRange}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     accessToken,
     { method: 'POST', body: JSON.stringify({ values: [newRow] }) }
   );
@@ -203,7 +197,7 @@ async function updateRows(sheetName, keyColumn, keyValue, updates, accessToken) 
         const colIdx = headers.indexOf(key);
         if (colIdx !== -1) rowCopy[colIdx] = updates[key];
       }
-      const rowNumber = i + 1; // 1-indexed, +1 lagi karena header di baris 1
+      const rowNumber = i + 1;
       batchData.push({
         range: `${sheetName}!A${rowNumber}:${lastColLetter}${rowNumber}`,
         values: [rowCopy]
@@ -237,10 +231,7 @@ async function getFileData(savingsId, accessToken) {
   return '';
 }
 
-// ----- Handler utama -----
 export default async function handler(req, res) {
-  // Same-origin (frontend & API di domain Vercel yang sama), tapi tambahkan
-  // CORS permisif juga buat jaga-jaga/testing dari domain lain.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
