@@ -238,7 +238,7 @@ async function getFileData(savingsId, accessToken) {
 }
 
 // ----- Handler utama -----
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // Same-origin (frontend & API di domain Vercel yang sama), tapi tambahkan
   // CORS permisif juga buat jaga-jaga/testing dari domain lain.
   res.setHeader('Access-Control-Allow-Origin', '*');
